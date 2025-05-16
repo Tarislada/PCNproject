@@ -1,7 +1,18 @@
+import torch
+import numpy as np
+import sys
+import os
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(project_root, 'Tightening-the-Biological-Constraints-on-Gradient-Based-Predictive-Coding'))
+sys.path.append(os.path.join(project_root, 'PRECO'))
+
 from Structure import *
-from PRECO.PRECO import DEVICE
-from PRECO.PRECO import optim
-from PRECO.PRECO import PCN
+from PRECO import optim
+from PRECO import PCN
+from PRECO.PCN import PCnet
+
+DEVICE = torch.device('cuda:0')
 
 class PCnet_KP(PCN.PCnet):
     """
@@ -25,7 +36,7 @@ class PCnet_KP(PCN.PCnet):
         self.kp_decay = kp_decay
     
     def _reset_params(self):
-        super().reset_params()
+        super()._reset_params()
         # Initialize error weigths
         self.e_w = []
         for l in range(len(self.w)):
@@ -66,7 +77,7 @@ class PCnet_KP(PCN.PCnet):
             
             if self.incremental:
                 self.update_w()
-                if not self.structure.use_true_gradients and self.structure.train_error_weights:
+                if not self.structure.use_true_gradient and self.structure.train_error_weights:
                     self.update_e_w()
                 self.optimizer.step(self.params, self.grads, batch_size=1)
             
@@ -97,7 +108,7 @@ class PCnet_KP(PCN.PCnet):
         Returns the parameters of the model.
         """
         params = super().params
-        if not self.structure.use_true_gradients and self.structure.train_error_weights:
+        if not self.structure.use_true_gradient and self.structure.train_error_weights:
             params["e_w"] = self.e_w
         return params
     
@@ -107,7 +118,7 @@ class PCnet_KP(PCN.PCnet):
         Returns the gradients of the model.
         """
         grads = super().grads
-        if not self.structure.use_true_gradients and self.structure.train_error_weights:
+        if not self.structure.use_true_gradient and self.structure.train_error_weights:
             grads["e_w"] = self.de_w
         return grads
     

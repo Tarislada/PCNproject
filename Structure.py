@@ -1,16 +1,16 @@
 import torch
-import PRECO.PRECO as PRECO
 import numpy as np
 import sys
 import os
 # Add the directory to sys.path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(project_root, 'Tightening-the-Biological-Constraints-on-Gradient-Based-Predictive-Coding'))
-# from train_PC import train_network
-# from utilities import compute_accuracy
+sys.path.append(os.path.join(project_root, 'PRECO'))
+from PRECO.structure import PCNStructure
+import PRECO
 
 # Trying AMB structure first
-class PCN_seperable_AMB(PRECO.structure.PCNStructure):
+class PCN_seperable_AMB(PCNStructure):
     """
     PCN structure with Kolen-Pollack-like separate weights for forward and backward paths.
     Addresses the weight transport problem with trainable error weights.

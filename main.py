@@ -1,15 +1,19 @@
+from torchvision.datasets import MNIST
+from torch.utils.data import DataLoader
+# from torch.nn.functional import one_hot
 from Model import *
-from PRECO.PRECO import *
-from PRECO.PRECO import optim
+from PRECO import *
+from PRECO import optim
+from PRECO.utils import onehot, sigmoid
 import torch
 from torch.utils.data import DataLoader
 
 structure = PCN_seperable_AMB(
     layers=[784, 300, 300, 10],  # Same as in original PC.py
-    f=torch.sigmoid,             # Or any activation function
+    f=sigmoid,             # Or any activation function
     use_bias=False,              # Match original implementation
     upward=True,                 # For discriminative PCN
-    use_true_gradients=False,    # Use separate weights
+    use_true_gradient=False,     # Use separate weights
     train_error_weights=True     # Train the error weights
 )
 
@@ -35,18 +39,13 @@ train_loader = DataLoader(
     shuffle=True
 )
 
-from torchvision.datasets import MNIST
-from torch.utils.data import DataLoader
-from torch.nn.functional import one_hot
-from torch.nn import functional as F
-
-
 epochs = 10
+print("Model initalized.")
 
 for epoch in range(epochs):
     for batch_idx, (images, y) in enumerate(train_loader):
         # Transform targets to one-hot
-        target = one_hot(y, N=10)
+        target = onehot(y, N=10)
         
         # Train the model
         model.train_supervised(images, target)
