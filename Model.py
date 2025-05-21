@@ -11,6 +11,8 @@ from Structure import *
 from PRECO import optim
 from PRECO import PCN
 from PRECO.PCN import PCnet
+from PRECO.utils import *
+
 
 DEVICE = torch.device('cuda:0')
 
@@ -83,6 +85,37 @@ class PCnet_KP(PCN.PCnet):
             
             if self.early_stop and early_stopper.early_stop(self.get_energy()):
                 break
+    
+    def train_updates(self, batch_no=None):
+        """
+        Override to properly pass e_w parameter to structure.grad_x
+        due to separate error weights e_w not working for PRECO PCN
+        """
+        # First compute errors (same as parent class)
+        for l in self.error_layers:
+            self.e[l] = self.x[l] - self.structure.pred(l, self.x, self.w, self.b)
+        
+        if self.early_stop:
+            early_stopper = optim.EarlyStopper(patience=0, min_delta=self.min_delta)
+    
+        for t in range(self.T_train): 
+            # Update hidden nodes with your custom grad_x that uses e_w
+            for l in self.hidden_layers: 
+                dEdx = self.structure.grad_x(l=l, train=True, x=self.x, e=self.e, w=self.w, b=self.b, e_w=self.e_w)
+                self.x[l] -= self.lr_x*dEdx
+    
+            # Recompute errors
+            for l in self.error_layers:
+                self.e[l] = self.x[l] - self.structure.pred(l, self.x, self.w, self.b)
+    
+            # Rest is same as parent
+            if self.incremental and self.dw.count(None) <= 1:
+                self.optimizer.step(self.params, self.grads, batch_size=self.x.shape[0])
+    
+            if self.early_stop:
+                if early_stopper.early_stop(self.get_energy()):
+                    print(f"\nEarly stopping inference at t={t}.")          
+                    break
     
     def update_w(self):
         """

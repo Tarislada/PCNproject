@@ -7,6 +7,7 @@ from PRECO import optim
 from PRECO.utils import onehot, sigmoid
 import torch
 from torch.utils.data import DataLoader
+from torchvision.transforms import ToTensor
 
 structure = PCN_seperable_AMB(
     layers=[784, 300, 300, 10],  # Same as in original PC.py
@@ -19,7 +20,7 @@ structure = PCN_seperable_AMB(
 
 model = PCnet_KP(
     lr_x=0.1,                   # Inference rate
-    T_train=20,                  # Inference iterations
+    T_train=5,                  # Inference iterations
     structure=structure,
     incremental=False,
     kp_decay=0.01                # Decay for KP update rule
@@ -28,24 +29,63 @@ model = PCnet_KP(
 optimizer = optim.Adam(
     model.params,
     learning_rate=0.001,
+    grad_clip=1,
+    batch_scale=False,
     weight_decay=0.0
 )
 model.set_optimizer(optimizer)
 
+MNIST_train = MNIST(root='data', train=True, download=True, transform=ToTensor())
+MNIST_test = MNIST(root='data', train=False, download=True, transform=ToTensor())
 
 train_loader = DataLoader(
-    dataset=MNIST(root='data', train=True, download=True, transform=None),
+    dataset=MNIST_train,
     batch_size=64,
     shuffle=True
 )
 
-epochs = 10
-print("Model initalized.")
+test_loader = DataLoader(
+    dataset=MNIST_test,
+    batch_size=64,
+    shuffle=False
+)
 
-for epoch in range(epochs):
-    for batch_idx, (images, y) in enumerate(train_loader):
-        # Transform targets to one-hot
-        target = onehot(y, N=10)
+# Datashape = [batch_size, channels, height, width]
+# MNIST shape = [64, 1, 28, 28]
+# print("Data loaded.")
+# labels = not one-hot encoded
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+epochs = 30
+print("Model initalized.")
+with torch.no_grad():
+    for epoch in range(epochs):
+        for batch_idx, (x, y) in enumerate(train_loader):
+            # Transform targets to one-hot
+            # target = onehot(y, N=10)
+            x = x.to(device)
+            y = y.to(device)
+            # Train the model
+            model.train_supervised(x, y)
+
+            # Print loss
+            if batch_idx % 100 == 0:
+                print(f"Epoch [{epoch+1}/{epochs}], Step [{batch_idx}/{len(train_loader)}], Loss: {model.get_energy():.4f}")
+        print(f"Epoch [{epoch+1}/{epochs}] completed.")
+        # Test the model
+
+        for batch_idx, (x, y) in enumerate(test_loader):
+            x = x.to(device)
+            y = y.to(device)
+            output = model.test_supervised(x)
+            
+            # Print loss
+            loss = torch.nn.MSELoss()(output, onehot(y, N=10)).item()
+            accuracy = torch.mean((torch.argmax(output, axis=1) == y).float()).item()
         
-        # Train the model
-        model.train_supervised(images, target)
+            if batch_idx % 100 == 0:
+                print(f"Test Step [{batch_idx}/{len(test_loader)}], Loss: {loss:.4f}, Acc: {accuracy:.4f}")
+        print(f"Test completed for epoch [{epoch+1}/{epochs}].")
+        # Save the model
+        # torch.save(model.state_dict(), f"model_epoch_{epoch+1}.pth")
+        # print(f"Model saved for epoch [{epoch+1}/{epochs}].")
