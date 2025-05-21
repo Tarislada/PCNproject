@@ -2,6 +2,7 @@ from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 # from torch.nn.functional import one_hot
 from Model import *
+from optimizers import *
 from PRECO import *
 from PRECO import optim
 from PRECO.utils import onehot, sigmoid
@@ -26,7 +27,7 @@ model = PCnet_KP(
     kp_decay=0.01                # Decay for KP update rule
 )
 
-optimizer = optim.Adam(
+optimizer = KPAdam(
     model.params,
     learning_rate=0.001,
     grad_clip=1,
@@ -56,7 +57,7 @@ test_loader = DataLoader(
 # labels = not one-hot encoded
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-epochs = 30
+epochs = 50
 print("Model initalized.")
 with torch.no_grad():
     for epoch in range(epochs):
@@ -71,7 +72,19 @@ with torch.no_grad():
             # Print loss
             if batch_idx % 100 == 0:
                 print(f"Epoch [{epoch+1}/{epochs}], Step [{batch_idx}/{len(train_loader)}], Loss: {model.get_energy():.4f}")
+
         print(f"Epoch [{epoch+1}/{epochs}] completed.")
+        if epoch % 5 == 0:
+            # Print the gradients
+            for l in range(len(model.w)):
+                if model.dw[l] is not None and model.de_w[l] is not None:
+                    print(f"Layer {l} - fw_grad_norm: {model.dw[l].norm().item():.4f}, "
+                        f"bw_grad_norm: {model.de_w[l].norm().item():.4f}")
+            fw_norm = sum(w.norm().item() for w in model.w if w.numel() > 0)
+            bw_norm = sum(w.norm().item() for w in model.e_w if w.numel() > 0)
+            print(f"Forward weight norm: {fw_norm:.4f}, Backward weight norm: {bw_norm:.4f}")
+
+                
         # Test the model
 
         for batch_idx, (x, y) in enumerate(test_loader):
@@ -86,6 +99,8 @@ with torch.no_grad():
             if batch_idx % 100 == 0:
                 print(f"Test Step [{batch_idx}/{len(test_loader)}], Loss: {loss:.4f}, Acc: {accuracy:.4f}")
         print(f"Test completed for epoch [{epoch+1}/{epochs}].")
+
         # Save the model
         # torch.save(model.state_dict(), f"model_epoch_{epoch+1}.pth")
         # print(f"Model saved for epoch [{epoch+1}/{epochs}].")
+
