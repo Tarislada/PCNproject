@@ -50,10 +50,11 @@ class PCN_seperable_AMB(PCNStructure):
         if l != self.L:
             if self.use_true_gradient:
                 # Use true gradients (weight transposed)
-                grad = e[l] - self.dfldx(x[l],k) * (torch.matmul(e_w[k], w[k].T))
+                grad = e[l] - self.dfldx(x[l],k) * (torch.matmul(e[k], w[k].T))
             else:
                 # Use separate error weights
-                grad = e[l] - self.dfldx(x[l],k) * (torch.matmul(e_w[k], e_w[l]))
+                grad = e[l] - self.dfldx(x[l],k) * torch.matmul(e[k], e_w[l])
+                # grad = e[l] - self.dfldx(x[l],k) * (torch.matmul(e_w[k], e_w[l]))
         else:
             if train:
                 grad = 0
@@ -87,4 +88,3 @@ class PCN_seperable_AMB(PCNStructure):
         """
         k = l + 1 if self.upward else l - 1
         return -e[k]
-1
