@@ -9,6 +9,7 @@ from PRECO.utils import onehot, sigmoid
 import torch
 from torch.utils.data import DataLoader
 from torchvision.transforms import ToTensor
+from randompretrain import pretrain_model, get_default_pretrain_config
 
 structure = PCN_seperable_AMB(
     layers=[784, 300, 300, 10],  # Same as in original PC.py
