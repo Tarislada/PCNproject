@@ -31,11 +31,12 @@ class PCnet_KP(PCN.PCnet):
     """
     
     def __init__(self, lr_x, T_train, structure, incremental=False,
-                 min_delta=0, early_stop=False, kp_decay=0.01):
+                 min_delta=0, early_stop=False, kp_decay=0.01, T_test=None):
         # Ensure structure is a PCN_seperable_AMB instance
         assert isinstance(structure, PCN_seperable_AMB), "Structure must be an instance of PCN_seperable_AMB"
         super().__init__(lr_x, T_train, structure, incremental, min_delta, early_stop)
         self.kp_decay = kp_decay
+        self.T_test = T_test if T_test is not None else T_train
     
     def _reset_params(self):
         super()._reset_params()
@@ -99,7 +100,7 @@ class PCnet_KP(PCN.PCnet):
             early_stopper = optim.EarlyStopper(patience=0, min_delta=self.min_delta)
     
         for t in range(self.T_train): 
-            # Update hidden nodes with your custom grad_x that uses e_w
+            # Update hidden nodes with custom grad_x that uses e_w
             for l in self.hidden_layers: 
                 dEdx = self.structure.grad_x(l=l, train=True, x=self.x, e=self.e, w=self.w, b=self.b, e_w=self.e_w)
                 self.x[l] -= self.lr_x*dEdx
@@ -134,6 +135,8 @@ class PCnet_KP(PCN.PCnet):
                 # Apply Kolen-Pollack rule with decay
                 if self.kp_decay > 0:
                     self.de_w[l] = self.de_w[l] - self.kp_decay * self.e_w[l]
+                else:
+                    self.de_w[l] = self.de_w[l] - self.structure.grad_e_w(l, self.x, self.e, self.w, self.b, self.e_w)
                 
     @property
     def params(self):
