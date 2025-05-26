@@ -2,6 +2,7 @@ from torchvision.datasets import MNIST, CIFAR10
 from torch.utils.data import DataLoader
 # from torch.nn.functional import one_hot
 from Model import *
+from randompretrain import *
 from optimizers import *
 from PRECO import *
 from PRECO import optim
@@ -12,8 +13,8 @@ from torchvision.transforms import ToTensor
 from randompretrain import pretrain_model, get_default_pretrain_config
 
 structure = PCN_seperable_AMB(
-    # layers=[784, 300, 300, 10],  # Same as in original PC.py
-    layers = [3072, 1000, 1000, 1000, 10],  # For CIFAR10
+    layers=[784, 300, 300, 10],  # Same as in original PC.py
+    # layers = [3072, 1000, 1000, 1000, 10],  # For CIFAR10
     f=sigmoid,             # Or any activation function
     use_bias=False,              # Match original implementation
     upward=True,                 # For discriminative PCN
@@ -22,28 +23,28 @@ structure = PCN_seperable_AMB(
 )
 
 model = PCnet_KP(
-    lr_x=0.05,                   # Inference rate
+    lr_x=0.1,                   # Inference rate
     T_train=5,                  # Inference iterations
     structure=structure,
     incremental=False,
     kp_decay=0.01                # Decay for KP update rule
 )
 # optimizer that uses Kolen-Pollack update rule
-optimizer = KPAdam(
-    model.params,
-    learning_rate=0.00005,
-    grad_clip=1,
-    batch_scale=False,
-    weight_decay=0.0
-)
-# Optimizer that uses Adam update rule
-# optimizer = BaseAdam(
+# optimizer = KPAdam(
 #     model.params,
-#     learning_rate=0.001,
+#     learning_rate=0.00005,
 #     grad_clip=1,
 #     batch_scale=False,
 #     weight_decay=0.0
 # )
+# Optimizer that uses Adam update rule
+optimizer = BaseAdam(
+    model.params,
+    learning_rate=0.0001,
+    grad_clip=1,
+    batch_scale=False,
+    weight_decay=0.0
+)
 
 model.set_optimizer(optimizer)
 
@@ -75,10 +76,10 @@ CIFAR10_test_loader = DataLoader(
     batch_size=128,
     shuffle=False
 )
-# train_loader = MNIST_train_loader
-# test_loader = MNIST_test_loader
-train_loader = CIFAR10_train_loader
-test_loader = CIFAR10_test_loader
+train_loader = MNIST_train_loader
+test_loader = MNIST_test_loader
+# train_loader = CIFAR10_train_loader
+# test_loader = CIFAR10_test_loader
 
 
 # Datashape = [batch_size, channels, height, width]
@@ -86,6 +87,23 @@ test_loader = CIFAR10_test_loader
 # CIFAR10 shape = [64, 3, 32, 32]
 # print("Data loaded.")
 # labels = not one-hot encoded
+
+test_config = {
+        'epochs': 30,
+        'batch_size': 64,
+        'input_size': 784,
+        'output_size': 10,
+        'num_batches': 50,
+        'input_distribution': 'normal',
+        'distribution_params': {
+            'mean': 0.0,
+            'std': 1.0
+        }
+    }
+
+# Pretrain the model
+# pretrain_config = get_default_pretrain_config()
+pretrain_model(model, test_config)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 epochs = 50
@@ -135,5 +153,3 @@ with torch.no_grad():
         # torch.save(model.state_dict(), f"model_epoch_{epoch+1}.pth")
         # print(f"Model saved for epoch [{epoch+1}/{epochs}].")
 
-# pretrain_config = get_default_pretrain_config()
-# pretrain_model(model, pretrain_config)
