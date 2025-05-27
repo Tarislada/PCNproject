@@ -52,7 +52,7 @@ class CIFAR10modelConfig(Config):
     Configuration class for CIFAR-10 model.
     Inherits from Config and overrides specific parameters for CIFAR-10.
     """
-    LAYERS = [3072, 512, 512, 10]  # CIFAR-10 input size is 32x32x3 = 3072
+    LAYERS = [3072, 1024, 512, 10]  # CIFAR-10 input size is 32x32x3 = 3072
     USE_BIAS = True
     UPWARD = True
     USE_TRUE_GRADIENT = False
@@ -62,7 +62,7 @@ class CIFAR10modelConfig(Config):
     T_TRAIN = 10
     EPOCHS = 100
     BATCH_SIZE = 128
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.0001
     KP_DECAY = 0.01
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
