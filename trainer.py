@@ -3,10 +3,12 @@ from torch.utils.data import DataLoader
 from PRECO.utils import onehot
 
 class Trainer:
-    def __init__(self, model, config):
+    def __init__(self, model, config, weight_tracker=None):
         self.model = model
         self.config = config
         self.device = torch.device(config.DEVICE)
+        self.weight_tracker = weight_tracker
+
     
     def train_epoch(self, train_loader, epoch):
         """Train for one epoch"""
@@ -17,6 +19,8 @@ class Trainer:
             if batch_idx % 100 == 0:
                 energy = self.model.get_energy()
                 print(f"Epoch [{epoch+1}], Step [{batch_idx}/{len(train_loader)}], Loss: {energy:.4f}")
+        if self.weight_tracker:
+            self.weight_tracker.record_alignment_epoch(epoch)
     
     def test_epoch(self, test_loader):
         """Test for one epoch"""
@@ -49,3 +53,6 @@ class Trainer:
             fw_norm = sum(w.norm().item() for w in self.model.w if w.numel() > 0)
             bw_norm = sum(w.norm().item() for w in self.model.e_w if w.numel() > 0)
             print(f"Forward weight norm: {fw_norm:.4f}, Backward weight norm: {bw_norm:.4f}")
+            # Weight alignment stats if tracker available
+            if self.weight_tracker:
+                self.weight_tracker.print_alignment_stats(epoch)

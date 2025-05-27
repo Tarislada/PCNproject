@@ -3,12 +3,13 @@ from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import ToTensor
 
-from config import Config
+from config import *
 from Model import PCnet_KP
 from Structure import PCN_seperable_AMB
 from optimizers import KPAdam
 from trainer import Trainer
 from randompretrain import pretrain_model, get_default_pretrain_config
+from visualizer import *
 from PRECO.utils import sigmoid
 from PRECO.optim import Adam as BaseAdam
 
@@ -83,11 +84,15 @@ def create_CIFAR10data_loaders(config):
 
 def main():
     """Main training pipeline"""
-    config = Config()
+    # config = Config()
+    config = MNISTmodelConfig()  # or CIFAR10modelConfig() for CIFAR-10
     
     # Create model and data loaders
     model = create_model(config)
     train_loader, test_loader = create_MNISTdata_loaders(config)
+    
+    weight_tracker = WeightAlignmentTracker(model)
+    weight_tracker.capture_snapshot('before_pretraining')
     
     # Pretraining (BEFORE main training)
     print("Starting pretraining...")
@@ -95,9 +100,11 @@ def main():
     pretrain_config['epochs'] = config.PRETRAIN_EPOCHS
     pretrain_model(model, pretrain_config)
     
+    weight_tracker.capture_snapshot('after_pretraining')
+
     # Main training
     print("Starting main training...")
-    trainer = Trainer(model, config)
+    trainer = Trainer(model, config, weight_tracker=weight_tracker)
     
     with torch.no_grad():
         for epoch in range(config.EPOCHS):
@@ -111,6 +118,14 @@ def main():
             # Testing
             avg_loss, avg_acc = trainer.test_epoch(test_loader)
             print(f"Test completed - Avg Loss: {avg_loss:.4f}, Avg Acc: {avg_acc:.4f}")
+
+    print("Generating weight alignment visualizations...")
+    weight_tracker.plot_comparison_histograms()
+    weight_tracker.plot_alignment_progression()
+    
+    # print("Analyzing model representations...")
+    # mnist_repr, mnist_labels, cifar_repr, cifar_labels = analyze_representations(
+    #     model, MNIST_test_loader=, CIFAR10_test_loader=, device=config.DEVICE)
 
 if __name__ == "__main__":
     main()
