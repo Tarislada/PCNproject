@@ -1,7 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
+import time
 from PRECO.utils import onehot
 from  randompretrain import generate_random_data
+from visualizer import *
 
 class Trainer:
     def __init__(self, model, config, weight_tracker=None):
@@ -9,18 +11,55 @@ class Trainer:
         self.config = config
         self.device = torch.device(config.DEVICE)
         self.weight_tracker = weight_tracker
+        
+        # For convergence analysis
+        self.metrics = {
+            'loss': [],
+            'accuracy': []
+        }
+        self.epochs = []
+        self.epoch_times = []
+        
+            # Weight trajectory analyzer
+        self.trajectory_analyzer = None
+        if hasattr(config, 'TRACK_TRAJECTORIES') and config.TRACK_TRAJECTORIES:
+            self.trajectory_analyzer = WeightTrajectoryAnalyzer(model)
+
     
     def train_epoch(self, train_loader, epoch):
         """Train for one epoch"""
+        start_time = time.time()
+        epoch_loss = 0
+        n_batches = 0
+        
         for batch_idx, (x, y) in enumerate(train_loader):
             x, y = x.to(self.device), y.to(self.device)
             self.model.train_supervised(x, y)
             
+            epoch_loss += self.model.get_energy()
+            n_batches += 1
+            
             if batch_idx % 100 == 0:
                 energy = self.model.get_energy()
                 print(f"Epoch [{epoch+1}], Step [{batch_idx}/{len(train_loader)}], Loss: {energy:.4f}")
+
+        # Record metrics
+        avg_loss = epoch_loss / n_batches if n_batches > 0 else 0
+        self.metrics['loss'].append(avg_loss)
+        self.epochs.append(epoch)
+        
+        # Record time
+        epoch_time = time.time() - start_time
+        self.epoch_times.append(epoch_time)
+        
+        # Record weight alignment if tracker is provided
         if self.weight_tracker:
             self.weight_tracker.record_alignment_epoch(epoch)
+        
+        # Record weight trajectory if enabled
+        if self.trajectory_analyzer:
+            self.trajectory_analyzer.record_weights(epoch)
+
     
     def test_epoch(self, test_loader):
         """Test for one epoch"""
@@ -49,6 +88,8 @@ class Trainer:
             pretrain_config: Configuration for pretraining
             epoch: Current pretraining epoch
         """
+        start_time = time.time()
+
         # Generate random data for this epoch
         pretrain_loader = generate_random_data(
             pretrain_config['batch_size'], 
@@ -83,8 +124,16 @@ class Trainer:
                       f"Energy: {current_energy:.4f}")
         
         # Record alignment after each pretraining epoch
+        epoch_time = time.time() - start_time
+        self.epoch_times.append(-epoch)  # Negative to distinguish from training
+        
+        # Record weight alignment if tracker is provided
         if self.weight_tracker:
-            self.weight_tracker.record_alignment_epoch(epoch)
+            self.weight_tracker.record_alignment_epoch(-epoch)  # Negative to distinguish pretraining
+        
+        # Record weight trajectory if enabled
+        if self.trajectory_analyzer:
+            self.trajectory_analyzer.record_weights(-epoch)  # Negative to distinguish pretraining
         
         avg_energy = epoch_energy / batch_count if batch_count > 0 else 0
         return avg_energy
