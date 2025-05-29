@@ -33,14 +33,14 @@ def create_model(config):
         kp_decay=config.KP_DECAY
     )
     
-    # Optimizer that uses Kolen-Pollack method
-    optimizer = KPAdam(
-        model.params,
-        learning_rate=config.LEARNING_RATE,
-        grad_clip=1,
-        batch_scale=False,
-        weight_decay=0.0
-    )
+    # # Optimizer that uses Kolen-Pollack method
+    # optimizer = KPAdam(
+    #     model.params,
+    #     learning_rate=config.LEARNING_RATE,
+    #     grad_clip=1,
+    #     batch_scale=False,
+    #     weight_decay=0.0
+    # )
     # Optimizer that does not use Kolen-Pollack method
     optimizer = BaseAdam(
         model.params,
@@ -94,17 +94,18 @@ def main():
     weight_tracker = WeightAlignmentTracker(model)
     weight_tracker.capture_snapshot('before_pretraining')
     
+    trainer = Trainer(model, config, weight_tracker=weight_tracker)
+    
     # Pretraining (BEFORE main training)
     print("Starting pretraining...")
     pretrain_config = get_default_pretrain_config()
     pretrain_config['epochs'] = config.PRETRAIN_EPOCHS
-    pretrain_model(model, pretrain_config)
+    trainer.pretrain_model(model, pretrain_config)
     
     weight_tracker.capture_snapshot('after_pretraining')
 
     # Main training
     print("Starting main training...")
-    trainer = Trainer(model, config, weight_tracker=weight_tracker)
     
     with torch.no_grad():
         for epoch in range(config.EPOCHS):

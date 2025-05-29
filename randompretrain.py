@@ -75,63 +75,66 @@ def generate_random_data(batch_size, input_size, output_size, num_batches=100,
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     return dataloader
 
-def pretrain_model(model, config):
-    """
-    Pretrain model with random data.
+# def pretrain_model(model, config, tracker=None):
+#     """
+#     Pretrain model with random data.
     
-    Args:
-        model: PCnet_KP model instance
-        config: Dictionary with pretraining parameters
-    """
-    print(f"Starting pretraining for {config['epochs']} epochs...")
-    print(f"Using {config['input_distribution']} distribution for inputs")
+#     Args:
+#         model: PCnet_KP model instance
+#         config: Dictionary with pretraining parameters
+#     """
+#     print(f"Starting pretraining for {config['epochs']} epochs...")
+#     print(f"Using {config['input_distribution']} distribution for inputs")
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    with torch.no_grad():
-        for epoch in range(config['epochs']):
-            pretrain_loader = generate_random_data(
-                config['batch_size'], 
-                config['input_size'], 
-                config['output_size'], 
-                config['num_batches'],
-                config['input_distribution'],
-                config.get('distribution_params', {})
-            )
+#     with torch.no_grad():
+#         for epoch in range(config['epochs']):
+#             pretrain_loader = generate_random_data(
+#                 config['batch_size'], 
+#                 config['input_size'], 
+#                 config['output_size'], 
+#                 config['num_batches'],
+#                 config['input_distribution'],
+#                 config.get('distribution_params', {})
+#             )
             
-            epoch_energy = 0
-            batch_count = 0
+#             epoch_energy = 0
+#             batch_count = 0
             
-            for batch_idx, (x, y) in enumerate(pretrain_loader):
-                x = x.to(device)
-                y = y.to(device)
+#             for batch_idx, (x, y) in enumerate(pretrain_loader):
+#                 x = x.to(device)
+#                 y = y.to(device)
                 
-                # Reshape input to match expected format if needed
-                if len(x.shape) == 2 and config['input_size'] == 784:
-                    x = x.view(x.shape[0], 1, 28, 28)
+#                 # Reshape input to match expected format if needed
+#                 if len(x.shape) == 2 and config['input_size'] == 784:
+#                     x = x.view(x.shape[0], 1, 28, 28)
                 
-                # Train the model
-                model.train_supervised(x, y)
+#                 # Train the model
+#                 model.train_supervised(x, y)
                 
-                current_energy = model.get_energy()
-                epoch_energy += current_energy
-                batch_count += 1
+#                 current_energy = model.get_energy()
+#                 epoch_energy += current_energy
+#                 batch_count += 1
                 
-                if batch_idx % 20 == 0:
-                    print(f"Pretrain Epoch [{epoch+1}/{config['epochs']}], "
-                          f"Batch [{batch_idx}/{len(pretrain_loader)}], "
-                          f"Energy: {current_energy:.4f}")
+#                 if batch_idx % 20 == 0:
+#                     print(f"Pretrain Epoch [{epoch+1}/{config['epochs']}], "
+#                           f"Batch [{batch_idx}/{len(pretrain_loader)}], "
+#                           f"Energy: {current_energy:.4f}")
+#             if tracker:
+#                 tracker.record_alignment_epoch(epoch)
             
-            avg_energy = epoch_energy / batch_count
-            print(f"Pretrain Epoch [{epoch+1}/{config['epochs']}] completed. Average Energy: {avg_energy:.4f}")
             
-            # Monitor weight norms during pretraining
-            if epoch % 2 == 0:
-                fw_norm = sum(w.norm().item() for w in model.w if w.numel() > 0)
-                bw_norm = sum(w.norm().item() for w in model.e_w if w.numel() > 0)
-                print(f"Pretrain - Forward weight norm: {fw_norm:.4f}, Backward weight norm: {bw_norm:.4f}")
+#             avg_energy = epoch_energy / batch_count
+#             print(f"Pretrain Epoch [{epoch+1}/{config['epochs']}] completed. Average Energy: {avg_energy:.4f}")
+            
+#             # Monitor weight norms during pretraining
+#             if epoch % 2 == 0:
+#                 fw_norm = sum(w.norm().item() for w in model.w if w.numel() > 0)
+#                 bw_norm = sum(w.norm().item() for w in model.e_w if w.numel() > 0)
+#                 print(f"Pretrain - Forward weight norm: {fw_norm:.4f}, Backward weight norm: {bw_norm:.4f}")
     
-    print("Pretraining completed!")
+#     print("Pretraining completed!")
 
 def get_default_pretrain_config():
     """Return default pretraining configuration."""
