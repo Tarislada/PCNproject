@@ -86,6 +86,7 @@ def main():
     """Main training pipeline"""
     # config = Config()
     config = MNISTmodelConfig()  # or CIFAR10modelConfig() for CIFAR-10
+    config.TRACK_TRAJECTORIES = True
     
     # Create model and data loaders
     model = create_model(config)
@@ -100,7 +101,7 @@ def main():
     print("Starting pretraining...")
     pretrain_config = get_default_pretrain_config()
     pretrain_config['epochs'] = config.PRETRAIN_EPOCHS
-    trainer.pretrain_model(model, pretrain_config)
+    trainer.pretrain_model(pretrain_config)
     
     weight_tracker.capture_snapshot('after_pretraining')
 
@@ -121,8 +122,20 @@ def main():
             print(f"Test completed - Avg Loss: {avg_loss:.4f}, Avg Acc: {avg_acc:.4f}")
 
     print("Generating weight alignment visualizations...")
-    weight_tracker.plot_comparison_histograms()
-    weight_tracker.plot_alignment_progression()
+    weight_tracker.generate_all_visualizations("output")
+    
+    if trainer.trajectory_analyzer:
+        trainer.trajectory_analyzer.plot_trajectory("output/weight_trajectory.png")
+    
+    # Example of convergence analysis
+    # This would typically be used to compare different runs
+    analyzer = ConvergenceAnalyzer()
+    analyzer.add_run("Current Run", trainer.epochs, trainer.metrics, trainer.epoch_times)
+    analyzer.plot_metric_comparison('loss', "output/loss_progression.png")
+
+
+    # weight_tracker.plot_comparison_histograms()
+    # weight_tracker.plot_alignment_progression()
     
     # print("Analyzing model representations...")
     # mnist_repr, mnist_labels, cifar_repr, cifar_labels = analyze_representations(
