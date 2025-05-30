@@ -139,7 +139,7 @@ def generate_random_data(batch_size, input_size, output_size, num_batches=100,
 def get_default_pretrain_config():
     """Return default pretraining configuration."""
     return {
-        'epochs': 3,
+        'epochs': 20,
         'batch_size': 64,
         'input_size': 784,
         'output_size': 10,
@@ -154,7 +154,7 @@ def get_default_pretrain_config():
 def get_pretrain_config_normal():
     """Return pretraining configuration with normal distribution."""
     return {
-        'epochs': 3,
+        'epochs': 20,
         'batch_size': 64,
         'input_size': 784,
         'output_size': 10,
@@ -169,7 +169,7 @@ def get_pretrain_config_normal():
 def get_pretrain_config_mnist_like():
     """Return pretraining configuration mimicking MNIST statistics."""
     return {
-        'epochs': 3,
+        'epochs': 20,
         'batch_size': 64,
         'input_size': 784,
         'output_size': 10,

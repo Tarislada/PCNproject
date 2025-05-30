@@ -71,7 +71,7 @@ class MNISTmodelConfig(Config):
     Configuration class for MNIST model.
     Inherits from Config and overrides specific parameters for MNIST.
     """
-    LAYERS = [784, 300, 300, 10]  # MNIST input size is 28x28 = 784
+    LAYERS = [784, 100, 10]  # MNIST input size is 28x28 = 784
     USE_BIAS = True
     UPWARD = True
     USE_TRUE_GRADIENT = False
@@ -79,8 +79,8 @@ class MNISTmodelConfig(Config):
     
     LR_X = 0.1
     T_TRAIN = 5
-    EPOCHS = 50
+    EPOCHS = 40
     BATCH_SIZE = 64
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.0005
     KP_DECAY = 0.01
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

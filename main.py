@@ -8,7 +8,7 @@ from Model import PCnet_KP
 from Structure import PCN_seperable_AMB
 from optimizers import KPAdam
 from trainer import Trainer
-from randompretrain import pretrain_model, get_default_pretrain_config
+from randompretrain import *
 from visualizer import *
 from PRECO.utils import sigmoid
 from PRECO.optim import Adam as BaseAdam
@@ -100,7 +100,7 @@ def main():
     # Pretraining (BEFORE main training)
     print("Starting pretraining...")
     pretrain_config = get_default_pretrain_config()
-    pretrain_config['epochs'] = config.PRETRAIN_EPOCHS
+    # pretrain_config['epochs'] = config.PRETRAIN_EPOCHS
     trainer.pretrain_model(pretrain_config)
     
     weight_tracker.capture_snapshot('after_pretraining')
@@ -132,7 +132,6 @@ def main():
     analyzer = ConvergenceAnalyzer()
     analyzer.add_run("Current Run", trainer.epochs, trainer.metrics, trainer.epoch_times)
     analyzer.plot_metric_comparison('loss', "output/loss_progression.png")
-
 
     # weight_tracker.plot_comparison_histograms()
     # weight_tracker.plot_alignment_progression()

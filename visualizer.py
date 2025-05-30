@@ -1,3 +1,4 @@
+import os
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -191,6 +192,7 @@ def analyze_representations(model, mnist_loader, cifar_loader, device):
 class WeightAlignmentTracker:
     def __init__(self, model):
         # For snapshots
+        self.model = model
         self.before_pretraining_sim = None
         self.before_pretraining_angles = None
         self.after_pretraining_sim = None
@@ -350,9 +352,11 @@ class WeightAlignmentTracker:
             before_angles = self.before_pretraining_angles[layer]
             after_angles = self.after_pretraining_angles[layer]
             
-            axes[idx].hist(before_angles, bins=10, alpha=0.6, color='skyblue', 
+            # bins = [0, 30, 60, 80, 90, 100, 120, 150, 180]
+            
+            axes[idx].hist(before_angles, bins=15, alpha=0.6, color='skyblue', 
                           label=f'Before (μ={np.mean(before_angles):.1f}°)', density=True)
-            axes[idx].hist(after_angles, bins=10, alpha=0.6, color='orange',
+            axes[idx].hist(after_angles, bins=15, alpha=0.6, color='orange',
                           label=f'After (μ={np.mean(after_angles):.1f}°)', density=True)
             
             axes[idx].axvline(np.mean(before_angles), color='blue', linestyle='--', alpha=0.8)
@@ -375,12 +379,68 @@ class WeightAlignmentTracker:
         if not self.alignment_history:
             print("No alignment history to plot")
             return
-            
+        
         plt.figure(figsize=(10, 6))
-        plt.plot(self.epoch_history, self.alignment_history, 'o-', linewidth=2, markersize=4)
+        
+        # Sort data points by epoch to ensure correct ordering
+        sorted_data = sorted(zip(self.epoch_history, self.alignment_history))
+        epochs = [item[0] for item in sorted_data]
+        angles = [item[1] for item in sorted_data]
+    
+        # Remove duplicate epoch 0 if it exists
+        if epochs.count(0) > 1:
+            # Find indices of all zeros
+            zero_indices = [i for i, e in enumerate(epochs) if e == 0]
+            # Keep only the first occurrence of epoch 0
+            for idx in sorted(zero_indices[1:], reverse=True):
+                epochs.pop(idx)
+                angles.pop(idx)    
+        
+        plt.plot(epochs, angles, 'o-', linewidth=2, markersize=4)
         plt.axhline(y=90, color='black', linestyle='--', alpha=0.7, label="Orthogonal (90°)")
+        plt.axvline(x=0, color='gray', linestyle='--', alpha=0.5, label="Start of Training")
+        plt.ylim(30,150)
         
         plt.title('Weight Alignment During Training', fontsize=16)
+        plt.xlabel('Epoch', fontsize=14)
+        plt.ylabel('Mean Angle W^T vs B (degrees)', fontsize=14)
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.ylim(0, 180)
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+    
+    def plot_layer_alignment_progression(self, save_path="layer_alignment_progression.png"):
+        """Plot alignment progression for each layer separately"""
+        if not self.layer_stats:
+            print("No per-layer alignment history available")
+            return
+            
+        plt.figure(figsize=(10, 6))
+        
+        # Get all layer names and epochs
+        layers = list(self.layer_stats.keys())
+        
+        # Plot one line per layer
+        for layer in layers:
+            data = self.layer_stats[layer]['angles']
+            epochs = [d['epoch'] for d in data]
+            means = [d['mean'] for d in data]
+            
+            # Sort by epoch
+            sorted_data = sorted(zip(epochs, means))
+            sorted_epochs = [item[0] for item in sorted_data]
+            sorted_means = [item[1] for item in sorted_data]
+            
+            plt.plot(sorted_epochs, sorted_means, 'o-', linewidth=2, markersize=4, 
+                     label=f'{layer.replace("_", " ").title()}')
+        
+        plt.axhline(y=90, color='black', linestyle='--', alpha=0.7, label="Orthogonal (90°)")
+        plt.axvline(x=0, color='gray', linestyle='--', alpha=0.5)
+        
+        plt.title('Layer-specific Weight Alignment During Training', fontsize=16)
         plt.xlabel('Epoch', fontsize=14)
         plt.ylabel('Mean Angle W^T vs B (degrees)', fontsize=14)
         plt.grid(alpha=0.3)
@@ -399,8 +459,22 @@ class WeightAlignmentTracker:
         
         plt.figure(figsize=(10, 6))
         
+        # Sort data points by epoch to ensure correct ordering
+        sorted_data = sorted(zip(self.epoch_history, self.alignment_history))
+        epochs = [item[0] for item in sorted_data]
+        angles = [item[1] for item in sorted_data]
+    
+        # Remove duplicate epoch 0 if it exists
+        if epochs.count(0) > 1:
+            # Find indices of all zeros
+            zero_indices = [i for i, e in enumerate(epochs) if e == 0]
+            # Keep only the first occurrence of epoch 0
+            for idx in sorted(zero_indices[1:], reverse=True):
+                epochs.pop(idx)
+                angles.pop(idx)   
+        
         # Plot mean line
-        plt.plot(self.epoch_history, self.angle_means, 'b-', linewidth=2, label='Mean Angle')
+        plt.plot(epochs, angles, 'b-', linewidth=2, label='Mean Angle')
         
         # Plot std area
         lower_bound = [mean - std for mean, std in zip(self.angle_means, self.angle_stds)]
@@ -420,6 +494,61 @@ class WeightAlignmentTracker:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.show()
     
+    def plot_layer_alignment_with_std(self, save_path="alignment_with_std.png"):
+        """Plot alignment progression with mean and std shaded area"""
+        if not self.alignment_history or len(self.angle_means) != len(self.angle_stds):
+            print("No alignment history to plot or mismatched mean/std data")
+            return
+        
+        plt.figure(figsize=(10, 6))
+        
+        # Sort data points by epoch to ensure correct ordering
+        sorted_data = sorted(zip(self.epoch_history, self.angle_means, self.angle_stds))
+        epochs = [item[0] for item in sorted_data]
+        means = [item[1] for item in sorted_data]
+        stds = [item[2] for item in sorted_data]
+    
+        # Remove duplicate epoch 0 if it exists
+        if epochs.count(0) > 1:
+            # Find indices of all zeros
+            zero_indices = [i for i, e in enumerate(epochs) if e == 0]
+            # Keep only the first occurrence of epoch 0
+            for idx in sorted(zero_indices[1:], reverse=True):
+                epochs.pop(idx)
+                means.pop(idx)
+                stds.pop(idx)
+        
+        # Plot mean line
+        plt.plot(epochs, means, 'b-', linewidth=2, label='Mean Angle')
+        
+        # Plot std area
+        lower_bound = [mean - std for mean, std in zip(means, stds)]
+        upper_bound = [mean + std for mean, std in zip(means, stds)]
+        plt.fill_between(epochs, lower_bound, upper_bound, alpha=0.3, color='blue')
+        
+        # Add reference lines
+        plt.axhline(y=90, color='black', linestyle='--', alpha=0.7, label="Orthogonal (90°)")
+        plt.axvline(x=0, color='gray', linestyle='--', alpha=0.5, label="Pretraining/Training Boundary")
+        
+        # Add annotations
+        if len(means) >= 2:
+            change = means[-1] - means[0]
+            direction = "decreased" if change < 0 else "increased"
+            plt.text(0.02, 0.95, f"Mean angle {direction} by {abs(change):.1f}° over training", 
+                    transform=plt.gca().transAxes, fontsize=10, 
+                    bbox=dict(facecolor='white', alpha=0.8))
+        
+        plt.title('Weight Alignment During Training (Mean ± Std)', fontsize=16)
+        plt.xlabel('Epoch (negative: pretraining, positive: training)', fontsize=14)
+        plt.ylabel('Mean Angle W^T vs B (degrees)', fontsize=14)
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.ylim(30, 150)  # More focused y-range to better see changes
+        
+        plt.tight_layout()
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.show()
+    
     def plot_weight_distribution_heatmap(self, save_path="weight_heatmap.png"):
         """Plot heatmap of weight distribution changes over epochs"""
         if not self.fw_distributions or not self.bw_distributions:
@@ -431,14 +560,14 @@ class WeightAlignmentTracker:
         # Process forward weights
         fw_data = []
         for dist in self.fw_distributions:
-            hist, edges = np.histogram(dist, bins=100, range=(-1, 1), density=True)
+            hist, edges = np.histogram(dist, bins=50, range=(-1, 1), density=True)
             fw_data.append(hist)
         fw_data = np.array(fw_data).T  # Transpose for correct orientation
         
         # Process backward weights
         bw_data = []
         for dist in self.bw_distributions:
-            hist, edges = np.histogram(dist, bins=100, range=(-1, 1), density=True)
+            hist, edges = np.histogram(dist, bins=50, range=(-1, 1), density=True)
             bw_data.append(hist)
         bw_data = np.array(bw_data).T  # Transpose for correct orientation
         
@@ -464,13 +593,14 @@ class WeightAlignmentTracker:
 
     def generate_all_visualizations(self, output_dir="visualizations"):
         """Generate all visualizations in one call"""
-        import os
+        if not os.path.exists(output_dir):
+            print(f"Creating output directory: {output_dir}")
         os.makedirs(output_dir, exist_ok=True)
         
         # Generate plots
         self.plot_comparison_histograms(os.path.join(output_dir, "angle_histograms.png"))
-        self.plot_alignment_progression(os.path.join(output_dir, "angle_progression.png"))
-        self.plot_alignment_with_std(os.path.join(output_dir, "angle_with_std.png"))
+        self.plot_layer_alignment_progression(os.path.join(output_dir, "angle_progression.png"))
+        self.plot_layer_alignment_with_std(os.path.join(output_dir, "angle_with_std.png"))
         self.plot_weight_distribution_heatmap(os.path.join(output_dir, "weight_heatmap.png"))
         
         print(f"All visualizations saved to {output_dir}/")
@@ -628,10 +758,8 @@ class WeightTrajectoryAnalyzer:
         
         # Apply dimensionality reduction
         if method == 'pca':
-            from sklearn.decomposition import PCA
             reducer = PCA(n_components=2)
         else:  # tsne
-            from sklearn.manifold import TSNE
             reducer = TSNE(n_components=2, random_state=42)
         
         # Project to 2D
@@ -646,6 +774,8 @@ class WeightTrajectoryAnalyzer:
         """Plot weight trajectory in 2D latent space"""
         fw_trajectory = self.compute_trajectory('forward', 'pca')
         bw_trajectory = self.compute_trajectory('backward', 'pca')
+        # fw_trajectory = self.compute_trajectory('forward', 'tsne')
+        # bw_trajectory = self.compute_trajectory('backward', 'tsne')
         
         if not fw_trajectory and not bw_trajectory:
             print("No trajectory data available")
@@ -715,6 +845,8 @@ class WeightTrajectoryAnalyzer:
             axes[ax_idx].set_xlabel('PC1', fontsize=12)
             axes[ax_idx].set_ylabel('PC2', fontsize=12)
             axes[ax_idx].grid(alpha=0.3)
+            axes[ax_idx].set_xlim(-10,10)
+            axes[ax_idx].set_ylim(-10,10)
             
             fig.colorbar(scatter, ax=axes[ax_idx], label='Epoch')
         
